@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1106</width>
+    <height>756</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <widget class="QTableView" name="tableView">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>110</y>
+     <width>1011</width>
+     <height>521</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="addButton">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>80</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Add</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>640</y>
+     <width>320</width>
+     <height>104</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout" rowminimumheight="30,30,30">
+    <item row="0" column="1">
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>account_id</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QPushButton" name="filterButton">
+      <property name="text">
+       <string>Filter</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QComboBox" name="accountComboBox"/>
+    </item>
+    <item row="2" column="0">
+     <widget class="QPushButton" name="refreshPushButton">
+      <property name="text">
+       <string>Refresh</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QPushButton" name="updateButton">
+      <property name="text">
+       <string>Update</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="QPushButton" name="cancelButton">
+      <property name="text">
+       <string>Cancel</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="QPushButton" name="deleteButton">
+      <property name="text">
+       <string>Delete</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="2">
+     <widget class="QLabel" name="label_11">
+      <property name="text">
+       <string>stock_id</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="QComboBox" name="stockComboBox"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>1011</width>
+     <height>68</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_2">
+    <item row="1" column="0">
+     <widget class="QDateEdit" name="dateEdit"/>
+    </item>
+    <item row="1" column="1">
+     <widget class="QComboBox" name="transTypeComboBox"/>
+    </item>
+    <item row="1" column="3">
+     <widget class="QLineEdit" name="transAmountLineEdit"/>
+    </item>
+    <item row="0" column="8">
+     <widget class="QLabel" name="label_8">
+      <property name="text">
+       <string>account_id</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="7">
+     <widget class="QLabel" name="label_7">
+      <property name="text">
+       <string>commission</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label_10">
+      <property name="text">
+       <string>trans_dt</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>trans_type</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="QLabel" name="label_4">
+      <property name="text">
+       <string>quantity</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="5">
+     <widget class="QLabel" name="label_5">
+      <property name="text">
+       <string>stock_id</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="6">
+     <widget class="QLabel" name="label_6">
+      <property name="text">
+       <string>price</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <widget class="QLineEdit" name="quantityLineEdit"/>
+    </item>
+    <item row="1" column="5">
+     <widget class="QLineEdit" name="stockIdLineEdit"/>
+    </item>
+    <item row="1" column="6">
+     <widget class="QLineEdit" name="priceLineEdit"/>
+    </item>
+    <item row="1" column="7">
+     <widget class="QLineEdit" name="commissionLineEdit"/>
+    </item>
+    <item row="1" column="8">
+     <widget class="QComboBox" name="accountIdComboBox"/>
+    </item>
+    <item row="1" column="2">
+     <widget class="QComboBox" name="realizedComboBox"/>
+    </item>
+    <item row="0" column="3">
+     <widget class="QLabel" name="label_3">
+      <property name="text">
+       <string>trans_amount</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="2">
+     <widget class="QLabel" name="label_9">
+      <property name="text">
+       <string>P/L Realized?</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <zorder>layoutWidget</zorder>
+  <zorder>layoutWidget</zorder>
+  <zorder>tableView</zorder>
+  <zorder>addButton</zorder>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
