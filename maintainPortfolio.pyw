@@ -4,6 +4,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4 import QtSql
 from googlefinance import getQuotes
+from yahoo_finance import Share
 from scipy import optimize
 from datetime import datetime, date, time
 import locale
@@ -41,7 +42,8 @@ class MyForm(QtGui.QDialog):
 #        self.genStats()
         self.sortOrder="Ascending"
         QtCore.QObject.connect(self.ui.getTransactionsButton, QtCore.SIGNAL('clicked()'),self.getTransactions)
-        QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesGoogle)
+        # QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesGoogle)
+        QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesYahoo)
         QtCore.QObject.connect(self.ui.genStatsButton, QtCore.SIGNAL('clicked()'),self.genStats)
         QtCore.QObject.connect(self.ui.longView.horizontalHeader(), QtCore.SIGNAL('sectionClicked(int)'),self.sortLongView)
         QtCore.QObject.connect(self.ui.shortView.horizontalHeader(), QtCore.SIGNAL('sectionClicked(int)'),self.sortShortView)
@@ -122,7 +124,7 @@ class MyForm(QtGui.QDialog):
         self.shortModel.clear()
         self.shortModel.setHorizontalHeaderLabels(["Ticker","Shares","Current Price","Sell Price","Sell Date","Return(%)","Market Value","Unrealized Gain","Port(%)","Allocation(%)","Over/Under(%)","Over/Under(shares)"])
         self.optionModel.clear()
-        self.optionModel.setHorizontalHeaderLabels(["Ticker","Contracts","Contract Price","Total Price","Contract Date"])
+        self.optionModel.setHorizontalHeaderLabels(["Ticker","Contracts","Contract Price","Total Price","Contract Date","Company","Strategy","Expiration","Strike Price","Equity Price"])
         longRowIndex = 0
         shortRowIndex = 0
         optionRowIndex = 0
@@ -135,8 +137,8 @@ class MyForm(QtGui.QDialog):
 #            print("stock_id: %s" %ticker)
             if ticker.length() <= 5: #ticker is for a stock; greater than 4 indicates an option
                 baseQuery = "SELECT MIN(trans_dt), SUM(trans_amount), SUM(quantity), SUM(commission) FROM transactions"
-                queryFilter = " WHERE realized = '0' AND (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()] 
-#                queryFilter = " WHERE (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()] 
+                queryFilter = " WHERE realized = '0' AND (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()]
+#                queryFilter = " WHERE (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()]
                 qStockQuery = baseQuery + queryFilter + (" AND stock_id='%s'" %ticker)  + self.filterStrList[self.ui.accountComboBox.currentIndex()]
 #                print (qStockQuery)
                 self.stockQuery.exec_(qStockQuery)
@@ -167,7 +169,7 @@ class MyForm(QtGui.QDialog):
                     shortRowIndex += 1
             else: #ticker is for an option
                 baseQuery = "SELECT MIN(trans_dt), SUM(trans_amount), SUM(quantity), SUM(commission) FROM transactions"
-                queryFilter = " WHERE (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()] 
+                queryFilter = " WHERE (trans_type = 'BUY' OR trans_type = 'SELL')" + self.filterStrList[self.ui.accountComboBox.currentIndex()]
                 qStockQuery = baseQuery + queryFilter + (" AND stock_id='%s'" %ticker)  + self.filterStrList[self.ui.accountComboBox.currentIndex()]
 #                print (qStockQuery)
                 self.stockQuery.exec_(qStockQuery)
@@ -186,11 +188,26 @@ class MyForm(QtGui.QDialog):
                     avg_price = total_price/total_contracts*-1.0
                     avgPriceItem = QStandardItem("$%7.2f" %avg_price)
                     avgPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    ticker_elements = ticker.split(" ")
+                    strategy_code = ticker_elements[1][6]
+                    if strategy_code == "P":
+                        strategy = "PUT"
+                    elif strategy_code == "C":
+                        strategy = "CALL"
+                    else:
+                        strategy = "UNKNOWN"
+                    expiration_date = "20" + ticker_elements[1][0:2] + "-" + ticker_elements[1][2:4] + "-" + ticker_elements[1][4:6]
+                    strike_price = float(ticker_elements[1][7:]) / 100
+                    strike_price_element = QStandardItem("$%7.2f" %strike_price)
                     self.optionModel.setItem(optionRowIndex, 0, tickerItem)
                     self.optionModel.setItem(optionRowIndex, 1, totalContractsItem)
                     self.optionModel.setItem(optionRowIndex, 2, avgPriceItem)
                     self.optionModel.setItem(optionRowIndex, 3, totalPriceItem)
                     self.optionModel.setItem(optionRowIndex, 4, QStandardItem(contract_date))
+                    self.optionModel.setItem(optionRowIndex, 5, QStandardItem(ticker_elements[0]))
+                    self.optionModel.setItem(optionRowIndex, 6, QStandardItem(strategy))
+                    self.optionModel.setItem(optionRowIndex, 7, QStandardItem(expiration_date))
+                    self.optionModel.setItem(optionRowIndex, 8, strike_price_element)
                     optionRowIndex += 1
             self.ui.longView.resizeColumnsToContents()
             self.ui.shortView.resizeColumnsToContents()
@@ -201,24 +218,36 @@ class MyForm(QtGui.QDialog):
     def updatePricesGoogle(self):
         print ("Updating Prices from Google")
         locale.setlocale(locale.LC_NUMERIC, '')
-        tickerList = []
+        tickerSet = set()
+        # Get ticker symbols from long table
         numRows=self.longModel.rowCount()
         rowIndex=0
         while rowIndex < numRows:
             ticker=str(self.longModel.item(rowIndex,0).text())
 #            print (ticker)
-            tickerList.append(ticker)
+            tickerSet.add(ticker)
             rowIndex += 1
+        # Get ticker symbols from Short table
         numRows=self.shortModel.rowCount()
         rowIndex=0
         while rowIndex < numRows:
             ticker=str(self.shortModel.item(rowIndex,0).text())
 #            print (ticker)
-            tickerList.append(ticker)
+            tickerSet.add(ticker)
             rowIndex += 1
-##        print (tickerList)
+        # Get ticker symbols from Options table
+        numRows=self.optionModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.optionModel.item(rowIndex,5).text())
+#            print (ticker)
+            tickerSet.add(ticker)
+            rowIndex += 1
+        tickerList = list(tickerSet)
+#        print (tickerList)
         googleQuotes = getQuotes(tickerList)
 ##        print (googleQuotes)
+        # Update current prices in Long Table
         numRows=self.longModel.rowCount()
         rowIndex=0
         while rowIndex < numRows:
@@ -232,13 +261,13 @@ class MyForm(QtGui.QDialog):
                     currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
                     self.longModel.setItem(rowIndex, 2, currPriceItem)
-                    googleQuotes.remove(quote)
                     break
             if quoteNotFound:
                 print ("A quote was not found for %s" %ticker)
                 print (googleQuotes)
             rowIndex += 1
         self.ui.longView.resizeColumnsToContents()
+        # Update current prices in Short Table
         numRows=self.shortModel.rowCount()
         rowIndex=0
         while rowIndex < numRows:
@@ -252,13 +281,75 @@ class MyForm(QtGui.QDialog):
                     currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
                     self.shortModel.setItem(rowIndex, 2, currPriceItem)
-                    googleQuotes.remove(quote)
                     break
             if quoteNotFound:
                 print ("A quote was not found for %s" %ticker)
                 print (googleQuotes)
             rowIndex += 1
         self.ui.shortView.resizeColumnsToContents()
+        # Update current prices in Optioins Table
+        numRows=self.optionModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.optionModel.item(rowIndex,5).text())
+            quoteNotFound = True
+            for quote in googleQuotes:
+                if quote['StockSymbol'] == ticker:
+                    quoteNotFound = False
+                    curr_price=float(quote['LastTradePrice'])
+                    currPriceItem = QStandardItem("$%7.2f" %curr_price)
+                    currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+                    self.optionModel.setItem(rowIndex, 9, currPriceItem)
+                    break
+            if quoteNotFound:
+                print ("A quote was not found for %s" %ticker)
+                print (googleQuotes)
+            rowIndex += 1
+        self.ui.shortView.resizeColumnsToContents()
+
+    def updatePricesYahoo(self):
+        print ("Updating Prices from Yahoo")
+        locale.setlocale(locale.LC_NUMERIC, '')
+        # Update current prices in Long Table
+        numRows=self.longModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.longModel.item(rowIndex,0).text())
+            stock = Share(ticker)
+            curr_price=locale.atof(stock.get_price())
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.longModel.setItem(rowIndex, 2, currPriceItem)
+            rowIndex += 1
+        self.ui.longView.resizeColumnsToContents()
+        # Update current prices in Short Table
+        numRows=self.shortModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.shortModel.item(rowIndex,0).text())
+            stock = Share(ticker)
+            curr_price=locale.atof(stock.get_price())
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.shortModel.setItem(rowIndex, 2, currPriceItem)
+            rowIndex += 1
+        self.ui.shortView.resizeColumnsToContents()
+        # Update current prices in Optioins Table
+        numRows=self.optionModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.optionModel.item(rowIndex,5).text())
+            stock = Share(ticker)
+            curr_price=locale.atof(stock.get_price())
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.optionModel.setItem(rowIndex, 9, currPriceItem)
+            rowIndex += 1
+        self.ui.optionView.resizeColumnsToContents()
 
     def genStats(self):
         print ("Generating Statistics")
@@ -357,7 +448,7 @@ class MyForm(QtGui.QDialog):
                 port_position=(market_value/self.port_value) *100
             else:
                 port_position=0.0
-            positionItem = QStandardItem("%7.1f" %port_position)
+            positionItem = QStandardItem("%7.2f" %port_position)
             positionItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.longModel.setItem(rowIndex, 8, positionItem)
             rowIndex += 1
@@ -370,7 +461,7 @@ class MyForm(QtGui.QDialog):
                 port_position=(market_value/self.port_value) *-100
             else:
                 port_position=0.0
-            positionItem = QStandardItem("%7.1f" %port_position)
+            positionItem = QStandardItem("%7.2f" %port_position)
             positionItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.shortModel.setItem(rowIndex, 8, positionItem)
             rowIndex += 1
@@ -390,12 +481,12 @@ class MyForm(QtGui.QDialog):
             self.stockQuery.exec_(baseQuery)
             self.stockQuery.next()
             allocation=self.stockQuery.value(0).toFloat()[0]
-#            print ("ticker: %s allocation: %s" %(ticker,allocation))
-            allocationItem = QStandardItem("%7.1f" %allocation)
+            print ("ticker: %s allocation: %s" %(ticker,allocation))
+            allocationItem = QStandardItem("%7.2f" %allocation)
             allocationItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.longModel.setItem(rowIndex, 9, allocationItem)
             overUnderPercent=curr_percent-allocation
-            overUnderPercentItem = QStandardItem("%7.1f" %overUnderPercent)
+            overUnderPercentItem = QStandardItem("%7.2f" %overUnderPercent)
             overUnderPercentItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if abs(overUnderPercent) >= 0.5:
                 overUnderPercentItem.setBackground(QBrush(Qt.yellow))
@@ -418,11 +509,11 @@ class MyForm(QtGui.QDialog):
             self.stockQuery.next()
             allocation=self.stockQuery.value(0).toFloat()[0]
 #            print ("ticker: %s allocation: %s" %(ticker,allocation))
-            allocationItem = QStandardItem("%7.1f" %allocation)
+            allocationItem = QStandardItem("%7.2f" %allocation)
             allocationItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.shortModel.setItem(rowIndex, 9, allocationItem)
             overUnderPercent=curr_percent-allocation
-            overUnderPercentItem = QStandardItem("%7.1f" %overUnderPercent)
+            overUnderPercentItem = QStandardItem("%7.2f" %overUnderPercent)
             overUnderPercentItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if abs(overUnderPercent) >= 0.5:
                 overUnderPercentItem.setBackground(QBrush(Qt.yellow))
@@ -467,7 +558,7 @@ class MyForm(QtGui.QDialog):
         * cashflows: a list object in which each element is a tuple of the form (date, amount),
                        where date is a python datetime.date object and amount is an integer or floating point number.
                        Cash outflows (investments) are represented with negative amounts, and cash inflows (returns) are positive amounts.
-    
+
         Returns
         -------abs
         * returns a single value which is the NPV of the given cash flows.
@@ -476,8 +567,8 @@ class MyForm(QtGui.QDialog):
         * The Net Present Value is the sum of each of cash flows discounted back to the date of the first cash flow.
           The discounted value of a given cash flow is A/(1+r)**(t-t0),
           where A is the amount, r is the discout rate,
-          and (t-t0) is the time in years from the date of the first cash flow in the series (t0) to the date of the cash flow being added to the sum (t).  
-        * This function is equivalent to the Microsoft Excel function of the same name. 
+          and (t-t0) is the time in years from the date of the first cash flow in the series (t0) to the date of the cash flow being added to the sum (t).
+        * This function is equivalent to the Microsoft Excel function of the same name.
         """
 
         chron_order = sorted(cashflows, key = lambda x: x[0])
@@ -493,23 +584,23 @@ class MyForm(QtGui.QDialog):
         * cashflows: a list object in which each element is a tuple of the form (date, amount),
                        where date is a python datetime.date object and amount is an integer or floating point number.
                        Cash outflows (investments) are represented with negative amounts, and cash inflows (returns) are positive amounts.
-        * guess (optional, default = 0.1): a guess at the solution to be used as a starting point for the numerical solution. 
+        * guess (optional, default = 0.1): a guess at the solution to be used as a starting point for the numerical solution.
         Returnsabs
         --------
         * Returns the IRR as a single value
-    
+
         Notes
         ----------------
         * The Internal Rate of Return (IRR) is the discount rate at which the Net Present Value (NPV) of a series of cash flows is equal to zero.
             The NPV of the series of cash flows is determined using the xnpv function in this module.
-            The discount rate at which NPV equals zero is found using the secant method of numerical solution. 
+            The discount rate at which NPV equals zero is found using the secant method of numerical solution.
         * This function is equivalent to the Microsoft Excel function of the same name.
         * For users that do not have the scipy module installed, there is an alternate version (commented out) that uses the secant_method function
             defined in the module rather than the scipy.optimize module's numerical solver.
             Both use the same method of calculation so there should be no difference in performance,
             but the secant_method function does not fail gracefully in cases where there is no solution, so the scipy.optimize.newton version is preferred.
         """
-    
+
         #return secant_method(0.0001,lambda r: xnpv(r,cashflows),guess)
         return optimize.newton(lambda r: self.xnpv(r,cashflows),guess)
 
@@ -517,17 +608,17 @@ class MyForm(QtGui.QDialog):
 #        print ("Sorting Long View")
 #        print (section)
         self.ui.longView.sortByColumn(section)
-        
+
     def sortShortView(self, section):
 #        print ("Sorting Short View")
 #        print (section)
         self.ui.shortView.sortByColumn(section)
-        
+
     def sortOptionView(self, section):
 #        print ("Sorting Option View")
 #        print (section)
         self.ui.optionView.sortByColumn(section)
-        
+
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
     if not createConnection():
@@ -535,4 +626,3 @@ if __name__ == "__main__":
     myapp = MyForm()
     myapp.show()
     sys.exit(app.exec_())
-
