@@ -5,9 +5,11 @@ from PyQt4.QtGui import *
 from PyQt4 import QtSql
 from googlefinance import getQuotes
 from yahoo_finance import Share
+from alpha_vantage.timeseries import TimeSeries
 from scipy import optimize
 from datetime import datetime, date, time
 import locale
+import time
 
 def createConnection():
     db = QtSql.QSqlDatabase.addDatabase('QMYSQL')
@@ -43,7 +45,7 @@ class MyForm(QtGui.QDialog):
         self.sortOrder="Ascending"
         QtCore.QObject.connect(self.ui.getTransactionsButton, QtCore.SIGNAL('clicked()'),self.getTransactions)
         # QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesGoogle)
-        QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesYahoo)
+        QtCore.QObject.connect(self.ui.updatePricesButton, QtCore.SIGNAL('clicked()'),self.updatePricesAlphaVantage)
         QtCore.QObject.connect(self.ui.genStatsButton, QtCore.SIGNAL('clicked()'),self.genStats)
         QtCore.QObject.connect(self.ui.longView.horizontalHeader(), QtCore.SIGNAL('sectionClicked(int)'),self.sortLongView)
         QtCore.QObject.connect(self.ui.shortView.horizontalHeader(), QtCore.SIGNAL('sectionClicked(int)'),self.sortShortView)
@@ -350,6 +352,63 @@ class MyForm(QtGui.QDialog):
             self.optionModel.setItem(rowIndex, 9, currPriceItem)
             rowIndex += 1
         self.ui.optionView.resizeColumnsToContents()
+
+    def updatePricesAlphaVantage(self):
+        print ("Updating Prices from Alpha Vantage")
+        locale.setlocale(locale.LC_NUMERIC, '')
+        ts = TimeSeries(key='QLVWW4KKUV0NVWPP')
+        # Update current prices in Long Table
+        numRows=self.longModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.longModel.item(rowIndex,0).text())
+            try:
+                data,meta_data = ts.get_daily(symbol=ticker)
+                latest_date = max(data.keys())
+                curr_price = locale.atof(data[latest_date]['4. close'])
+            except:
+                curr_price = "0.00"
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.longModel.setItem(rowIndex, 2, currPriceItem)
+            rowIndex += 1
+        self.ui.longView.resizeColumnsToContents()
+        # Update current prices in Short Table
+        numRows=self.shortModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.shortModel.item(rowIndex,0).text())
+            try:
+                data,meta_data = ts.get_daily(symbol=ticker)
+                latest_date = max(data.keys())
+                curr_price = locale.atof(data[latest_date]['4. close'])
+            except:
+                curr_price = "0.00"
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.shortModel.setItem(rowIndex, 2, currPriceItem)
+            rowIndex += 1
+        self.ui.shortView.resizeColumnsToContents()
+        # Update current prices in Optioins Table
+        numRows=self.optionModel.rowCount()
+        rowIndex=0
+        while rowIndex < numRows:
+            ticker=str(self.optionModel.item(rowIndex,5).text())
+            try:
+                data,meta_data = ts.get_daily(symbol=ticker)
+                latest_date = max(data.keys())
+                curr_price = locale.atof(data[latest_date]['4. close'])
+            except:
+                curr_price = "0.00"
+            currPriceItem = QStandardItem("$%7.2f" %curr_price)
+            currPriceItem.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            print ("symbol: %s price: %s" %(ticker,currPriceItem.text()))
+            self.optionModel.setItem(rowIndex, 9, currPriceItem)
+            rowIndex += 1
+        self.ui.optionView.resizeColumnsToContents()
+
 
     def genStats(self):
         print ("Generating Statistics")
